@@ -1,0 +1,85 @@
+# 상담 예약장
+
+19명이 이름·전화번호로 본인확인 후 1:1 상담 시간대를 선착순으로 예약하고,
+본인 예약 현황과 피드백을 확인할 수 있는 사이트입니다.
+관리자는 비밀번호로 별도 페이지에 접속해 명단·시간대·예약 현황·피드백을 관리합니다.
+
+- `index.html` — 참가자용 예약 페이지
+- `admin.html` — 관리자 페이지
+- `firebase-config.js` — Firebase 연결 설정 (직접 채워야 하는 파일)
+
+## 1. Firebase 프로젝트 준비
+
+1. https://console.firebase.google.com 에서 새 프로젝트 생성
+2. 왼쪽 메뉴 **빌드 > Firestore Database** 에서 데이터베이스 만들기
+   - 위치는 아무 곳이나 무방 (asia-northeast3, 서울 권장)
+   - 처음에는 "테스트 모드"로 시작해도 되고, 아래 4번 규칙을 바로 넣어도 됩니다
+3. 프로젝트 설정(톱니바퀴) > **일반** > "내 앱" > 웹 앱 추가(</> 아이콘)
+4. 나오는 `firebaseConfig` 값을 복사해서 `firebase-config.js` 파일의 값에 그대로 붙여넣기
+5. 같은 파일에서 `ADMIN_PASSWORD` 값을 원하는 비밀번호로 변경
+
+## 2. Firestore 보안 규칙
+
+이 사이트는 로그인 기능 없이 이름+전화번호로만 확인하는 가벼운 구조입니다.
+아래 규칙을 Firestore > 규칙 탭에 붙여넣으세요. (외부에서 데이터를 읽고 쓸 수는 있지만,
+URL이 공개되지 않는 한 실제로 접근할 사람은 없습니다. 필요 이상으로 민감한 정보는
+데이터베이스에 넣지 않는 걸 권장합니다.)
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /participants/{phone} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /slots/{slotId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /feedback/{phone} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
+```
+
+## 3. 참가자 19명 등록
+
+배포 후 `admin.html`에 접속 → **명단 관리** 탭에서 19명의 이름/전화번호를 한 명씩 추가하세요.
+참가자는 예약 페이지에서 여기 등록된 이름+전화번호와 정확히 일치해야 본인확인이 됩니다.
+
+## 4. 상담 시간대 등록
+
+`admin.html` → **시간대 관리** 탭에서 날짜/시간을 하나씩 추가하면
+참가자 페이지에 "예약 가능한 시간"으로 즉시 표시됩니다.
+필요한 만큼 여러 개 등록해두면 됩니다 (예: 하루 5타임 × 4일 = 20타임).
+
+## 5. GitHub Pages로 배포
+
+1. 새 GitHub 저장소를 만들고 `index.html`, `admin.html`, `firebase-config.js` 세 파일을 업로드
+2. 저장소 **Settings > Pages** 에서 브랜치를 `main`(또는 `master`), 폴더를 `/ (root)`로 설정 후 저장
+3. 잠시 후 `https://아이디.github.io/저장소이름/` 로 접속하면 예약 페이지가 열립니다
+4. 관리자 페이지는 `https://아이디.github.io/저장소이름/admin.html` 로 접속
+
+## 사용 흐름 요약
+
+**참가자**
+1. 이름 + 전화번호 입력 → 확인하기
+2. 열려 있는 시간대 중 하나를 선택해 예약 (이미 예약이 있으면 새로 예약 불가, 취소 후 재예약 가능)
+3. 같은 화면에서 상담 후 등록된 피드백 확인
+
+**관리자** (`admin.html`, 비밀번호 입력 후 입장)
+- 예약 현황: 전체 예약을 표로 한눈에 확인, 필요 시 예약 취소
+- 시간대 관리: 상담 가능한 날짜/시간 추가·삭제
+- 명단 관리: 참가자 19명 등록·삭제
+- 피드백 작성: 참가자를 선택해 상담 피드백 입력 → 저장하면 참가자 본인 화면에 바로 반영
+
+## 참고
+
+- 시간대를 삭제하면 그 시간에 걸린 예약도 함께 사라집니다. 예약만 취소하고 시간대는
+  남겨두고 싶다면 **예약 현황** 탭의 "예약취소" 버튼을 사용하세요.
+- 관리자 비밀번호는 `firebase-config.js`의 `ADMIN_PASSWORD` 값이며, 이 파일이 GitHub 저장소에
+  공개(Public)로 올라가면 비밀번호도 함께 노출됩니다. 저장소를 Private으로 만들거나,
+  더 강한 보안이 필요하면 알려주세요 (Firebase Authentication 로그인 방식으로 바꿔드릴 수 있습니다).
