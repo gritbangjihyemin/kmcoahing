@@ -328,6 +328,13 @@ function enterMainStep(){
   loadFeedback();
 }
 
+function daysUntil(dateStr){
+  const target = new Date(dateStr + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.floor((target - today) / 86400000);
+}
+
 async function loadSlots(){
   const listEl = document.getElementById('slots-list');
   const myBlock = document.getElementById('my-reservation-block');
@@ -349,13 +356,23 @@ async function loadSlots(){
   });
 
   // 내 예약 표시
+  const existingNotice = document.getElementById('cancel-notice');
+  if(existingNotice) existingNotice.remove();
+
   if(mySlot){
     myBlock.style.display = 'block';
     const lbl = formatLabel(mySlot.date, mySlot.time);
+    const canCancel = daysUntil(mySlot.date) >= 3;
     myRow.innerHTML = `
       <span class="when">${lbl.main}<span class="weekday">${lbl.weekday}</span></span>
-      <button class="btn-line muted" onclick="cancelSlot('${mySlot.id}')">취소</button>
+      ${canCancel
+        ? `<button class="btn-line muted" onclick="cancelSlot('${mySlot.id}')">취소</button>`
+        : `<span class="status-closed">취소 불가</span>`}
     `;
+    if(!canCancel){
+      myRow.insertAdjacentHTML('afterend',
+        '<p class="empty" id="cancel-notice" style="margin-top:-4px;">상담 3일 전부터는 취소할 수 없습니다. 변경이 필요하면 담당자에게 문의해주세요.</p>');
+    }
   } else {
     myBlock.style.display = 'none';
   }
@@ -415,6 +432,12 @@ window.cancelSlot = async function(slotId){
   if(!confirm('예약을 취소할까요?')) return;
   setLoading(true);
   try{
+    const doc = await db.collection('slots').doc(slotId).get();
+    if(!doc.exists) throw new Error('존재하지 않는 시간대입니다.');
+    const data = doc.data();
+    if(daysUntil(data.date) < 3){
+      throw new Error('상담 3일 전부터는 취소할 수 없습니다. 변경이 필요하면 담당자에게 문의해주세요.');
+    }
     await db.collection('slots').doc(slotId).update({
       reservedBy: firebase.firestore.FieldValue.delete(),
       reservedAt: firebase.firestore.FieldValue.delete()
@@ -424,7 +447,7 @@ window.cancelSlot = async function(slotId){
     showToast('예약이 취소되었습니다.');
   }catch(e){
     setLoading(false);
-    alert('취소 중 오류가 발생했습니다: ' + e.message);
+    alert(e.message || '취소 중 오류가 발생했습니다.');
   }
 };
 
