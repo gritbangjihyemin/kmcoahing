@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>상담 예약장 · 관리자</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Song+Myung&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+  :root{
+    --paper:#FAF7F1;
+    --ink:#22262B;
+    --rule:#D9D2C0;
+    --accent:#B4552F;
+    --accent-soft:#F0E3D3;
+    --complete:#5B7A5E;
+    --muted:#8A8577;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Pretendard', sans-serif;
+    min-height:100vh;
+  }
+  /* ---- 잠금 화면 ---- */
+  #lock-screen{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+  }
+  #lock-screen h1{
+    font-family:'Song Myung', serif;
+    font-weight:400;
+    font-size:28px;
+    margin-bottom:20px;
+  }
+  #lock-screen input{
+    font-size:16px;
+    padding:10px 2px;
+    border:none;
+    border-bottom:1px solid var(--rule);
+    background:transparent;
+    width:220px;
+    text-align:center;
+    margin-bottom:16px;
+    outline:none;
+  }
+  #lock-screen input:focus{ border-bottom:1px solid var(--accent); }
+  #lock-error{ color:var(--accent); font-size:13px; margin-bottom:12px; display:none; }
+
+  /* ---- 대시보드 ---- */
+  #dashboard{ display:none; max-width:920px; margin:0 auto; padding:40px 24px 80px; }
+  header{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:28px; }
+  header h1{
+    font-family:'Song Myung', serif;
+    font-weight:400;
+    font-size:28px;
+    margin:0;
+  }
+  header .summary{ font-size:13px; color:var(--muted); }
+
+  nav{ display:flex; gap:22px; border-bottom:1px solid var(--rule); margin-bottom:28px; }
+  nav button{
+    background:none; border:none; cursor:pointer;
+    font-family:inherit; font-size:14px; color:var(--muted);
+    padding:10px 0; border-bottom:2px solid transparent;
+  }
+  nav button.active{ color:var(--ink); border-bottom:2px solid var(--accent); }
+
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+
+  table{ width:100%; border-collapse:collapse; font-size:14px; }
+  th, td{ text-align:left; padding:10px 8px; border-bottom:1px solid var(--rule); }
+  th{ color:var(--muted); font-weight:500; font-size:13px; }
+  td.status-done{ color:var(--complete); }
+  td.status-open{ color:var(--muted); }
+
+  .btn{ font-family:inherit; font-size:13px; cursor:pointer; border:none; padding:6px 12px; }
+  .btn-accent{ background:var(--accent); color:#fff; }
+  .btn-line{ background:transparent; border:1px solid var(--rule); color:var(--muted); }
+  .btn-danger{ background:transparent; border:1px solid var(--accent); color:var(--accent); }
+
+  .form-row{ display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:end; }
+  .form-field{ display:flex; flex-direction:column; gap:6px; }
+  .form-field label{ font-size:12px; color:var(--muted); }
+  .form-field input, .form-field select, .form-field textarea{
+    font-family:inherit; font-size:14px; padding:8px; border:1px solid var(--rule); background:#fff;
+  }
+  textarea{ width:100%; min-height:140px; resize:vertical; }
+
+  .empty{ font-size:14px; color:var(--muted); padding:16px 0; }
+  #feedback-saved-msg{ font-size:13px; color:var(--complete); display:none; margin-top:8px; }
+</style>
+</head>
+<body>
+
+<!-- 잠금 화면 -->
+<div id="lock-screen">
+  <h1>상담 예약장 · 관리자</h1>
+  <input type="password" id="password-input" placeholder="비밀번호">
+  <p id="lock-error">비밀번호가 올바르지 않습니다.</p>
+  <button class="btn btn-accent" id="unlock-btn">입장</button>
+</div>
+
+<!-- 대시보드 -->
+<div id="dashboard">
+  <header>
+    <h1>상담 예약장 · 관리자</h1>
+    <span class="summary" id="summary-text"></span>
+  </header>
+
+  <nav>
+    <button class="tab-btn active" data-panel="panel-status">예약 현황</button>
+    <button class="tab-btn" data-panel="panel-slots">시간대 관리</button>
+    <button class="tab-btn" data-panel="panel-participants">명단 관리</button>
+    <button class="tab-btn" data-panel="panel-feedback">피드백 작성</button>
+  </nav>
+
+  <!-- 예약 현황 -->
+  <div class="panel active" id="panel-status">
+    <table>
+      <thead>
+        <tr><th>날짜</th><th>시간</th><th>예약자</th><th>전화번호</th><th>상태</th><th></th></tr>
+      </thead>
+      <tbody id="status-table-body"></tbody>
+    </table>
+  </div>
+
+  <!-- 시간대 관리 -->
+  <div class="panel" id="panel-slots">
+    <div class="form-row">
+      <div class="form-field">
+        <label for="slot-date">날짜</label>
+        <input type="date" id="slot-date">
+      </div>
+      <div class="form-field">
+        <label for="slot-time">시간</label>
+        <input type="time" id="slot-time">
+      </div>
+      <button class="btn btn-accent" id="add-slot-btn">시간대 추가</button>
+    </div>
+    <table>
+      <thead><tr><th>날짜</th><th>시간</th><th>상태</th><th></th></tr></thead>
+      <tbody id="slots-table-body"></tbody>
+    </table>
+  </div>
+
+  <!-- 명단 관리 -->
+  <div class="panel" id="panel-participants">
+    <div class="form-row">
+      <div class="form-field">
+        <label for="p-name">이름</label>
+        <input type="text" id="p-name" placeholder="예: 김서연">
+      </div>
+      <div class="form-field">
+        <label for="p-phone">전화번호</label>
+        <input type="tel" id="p-phone" placeholder="예: 010-1234-5678">
+      </div>
+      <button class="btn btn-accent" id="add-participant-btn">명단에 추가</button>
+    </div>
+    <table>
+      <thead><tr><th>이름</th><th>전화번호</th><th></th></tr></thead>
+      <tbody id="participants-table-body"></tbody>
+    </table>
+  </div>
+
+  <!-- 피드백 작성 -->
+  <div class="panel" id="panel-feedback">
+    <div class="form-row">
+      <div class="form-field" style="min-width:220px;">
+        <label for="fb-select">참가자 선택</label>
+        <select id="fb-select"></select>
+      </div>
+    </div>
+    <textarea id="fb-content" placeholder="상담 피드백을 입력하세요."></textarea>
+    <div style="margin-top:12px;">
+      <button class="btn btn-accent" id="save-feedback-btn">저장하기</button>
+      <span id="feedback-saved-msg">저장되었습니다.</span>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ---------- 잠금 화면 ----------
+function unlock(){
+  const pw = document.getElementById('password-input').value;
+  if(pw === ADMIN_PASSWORD){
+    sessionStorage.setItem('admin_authed', '1');
+    showDashboard();
+  } else {
+    document.getElementById('lock-error').style.display = 'block';
+  }
+}
+document.getElementById('unlock-btn').addEventListener('click', unlock);
+document.getElementById('password-input').addEventListener('keydown', e => { if(e.key === 'Enter') unlock(); });
+
+function showDashboard(){
+  document.getElementById('lock-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  loadAll();
+}
+
+if(sessionStorage.getItem('admin_authed') === '1'){
+  showDashboard();
+}
+
+// ---------- 탭 전환 ----------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.panel).classList.add('active');
+  });
+});
+
+// ---------- 공통 ----------
+function normalizePhone(v){ return (v || '').replace(/[^0-9]/g, ''); }
+
+function formatDate(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  const weekday = ['일','월','화','수','목','금','토'][d.getDay()];
+  const [y, m, day] = dateStr.split('-');
+  return `${parseInt(m)}월 ${parseInt(day)}일(${weekday})`;
+}
+
+async function loadAll(){
+  await Promise.all([renderStatus(), renderSlots(), renderParticipants(), renderFeedbackSelect()]);
+}
+
+// ---------- 예약 현황 ----------
+async function renderStatus(){
+  const tbody = document.getElementById('status-table-body');
+  const snap = await db.collection('slots').orderBy('date').orderBy('time').get();
+  tbody.innerHTML = '';
+  let doneCount = 0;
+  snap.forEach(doc => {
+    const d = doc.data();
+    const reserved = !!d.reservedBy;
+    if(reserved) doneCount++;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${formatDate(d.date)}</td>
+      <td>${d.time}</td>
+      <td>${reserved ? d.reservedBy.name : '-'}</td>
+      <td>${reserved ? d.reservedBy.phone : '-'}</td>
+      <td class="${reserved ? 'status-done' : 'status-open'}">${reserved ? '예약완료' : '공석'}</td>
+      <td>${reserved ? `<button class="btn btn-line" onclick="adminCancelSlot('${doc.id}')">예약취소</button>` : ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  const participantsSnap = await db.collection('participants').get();
+  document.getElementById('summary-text').textContent =
+    `등록 인원 ${participantsSnap.size}명 · 예약 완료 ${doneCount}건`;
+}
+
+window.adminCancelSlot = async function(slotId){
+  if(!confirm('이 예약을 취소할까요?')) return;
+  await db.collection('slots').doc(slotId).update({
+    reservedBy: firebase.firestore.FieldValue.delete(),
+    reservedAt: firebase.firestore.FieldValue.delete()
+  });
+  loadAll();
+};
+
+// ---------- 시간대 관리 ----------
+document.getElementById('add-slot-btn').addEventListener('click', async () => {
+  const date = document.getElementById('slot-date').value;
+  const time = document.getElementById('slot-time').value;
+  if(!date || !time){ alert('날짜와 시간을 모두 입력해주세요.'); return; }
+  await db.collection('slots').add({ date, time, reservedBy: null });
+  document.getElementById('slot-date').value = '';
+  document.getElementById('slot-time').value = '';
+  loadAll();
+});
+
+async function renderSlots(){
+  const tbody = document.getElementById('slots-table-body');
+  const snap = await db.collection('slots').orderBy('date').orderBy('time').get();
+  tbody.innerHTML = '';
+  if(snap.empty){
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">등록된 시간대가 없습니다.</td></tr>';
+    return;
+  }
+  snap.forEach(doc => {
+    const d = doc.data();
+    const reserved = !!d.reservedBy;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${formatDate(d.date)}</td>
+      <td>${d.time}</td>
+      <td class="${reserved ? 'status-done' : 'status-open'}">${reserved ? '예약됨 (' + d.reservedBy.name + ')' : '공석'}</td>
+      <td><button class="btn btn-danger" onclick="deleteSlot('${doc.id}')">삭제</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+window.deleteSlot = async function(slotId){
+  if(!confirm('이 시간대를 삭제할까요? 예약이 되어 있어도 함께 삭제됩니다.')) return;
+  await db.collection('slots').doc(slotId).delete();
+  loadAll();
+};
+
+// ---------- 명단 관리 ----------
+document.getElementById('add-participant-btn').addEventListener('click', async () => {
+  const name = document.getElementById('p-name').value.trim();
+  const phone = normalizePhone(document.getElementById('p-phone').value);
+  if(!name || !phone){ alert('이름과 전화번호를 모두 입력해주세요.'); return; }
+  await db.collection('participants').doc(phone).set({ name, phone });
+  document.getElementById('p-name').value = '';
+  document.getElementById('p-phone').value = '';
+  loadAll();
+});
+
+async function renderParticipants(){
+  const tbody = document.getElementById('participants-table-body');
+  const snap = await db.collection('participants').orderBy('name').get();
+  tbody.innerHTML = '';
+  if(snap.empty){
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">등록된 참가자가 없습니다.</td></tr>';
+    return;
+  }
+  snap.forEach(doc => {
+    const d = doc.data();
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.name}</td>
+      <td>${d.phone}</td>
+      <td><button class="btn btn-danger" onclick="deleteParticipant('${doc.id}')">삭제</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+window.deleteParticipant = async function(phone){
+  if(!confirm('이 참가자를 명단에서 삭제할까요?')) return;
+  await db.collection('participants').doc(phone).delete();
+  loadAll();
+};
+
+// ---------- 피드백 작성 ----------
+async function renderFeedbackSelect(){
+  const select = document.getElementById('fb-select');
+  const snap = await db.collection('participants').orderBy('name').get();
+  select.innerHTML = '';
+  snap.forEach(doc => {
+    const d = doc.data();
+    const opt = document.createElement('option');
+    opt.value = d.phone;
+    opt.textContent = `${d.name} (${d.phone})`;
+    select.appendChild(opt);
+  });
+  if(!select.value && select.options.length > 0){
+    select.selectedIndex = 0;
+  }
+  if(select.options.length > 0) loadFeedbackContent(select.value);
+}
+
+document.getElementById('fb-select').addEventListener('change', (e) => {
+  loadFeedbackContent(e.target.value);
+});
+
+async function loadFeedbackContent(phone){
+  if(!phone) return;
+  const doc = await db.collection('feedback').doc(phone).get();
+  document.getElementById('fb-content').value = doc.exists ? (doc.data().content || '') : '';
+}
+
+document.getElementById('save-feedback-btn').addEventListener('click', async () => {
+  const select = document.getElementById('fb-select');
+  const phone = select.value;
+  if(!phone) return;
+  const name = select.options[select.selectedIndex].textContent.split(' (')[0];
+  const content = document.getElementById('fb-content').value;
+  await db.collection('feedback').doc(phone).set({
+    name, phone, content, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  const msg = document.getElementById('feedback-saved-msg');
+  msg.style.display = 'inline';
+  setTimeout(() => { msg.style.display = 'none'; }, 2000);
+});
+</script>
+
+</body>
+</html>
