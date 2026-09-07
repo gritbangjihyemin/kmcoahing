@@ -96,6 +96,31 @@
 
   .empty{ font-size:14px; color:var(--muted); padding:16px 0; }
   #feedback-saved-msg{ font-size:13px; color:var(--complete); display:none; margin-top:8px; }
+
+  .table-scroll{ overflow-x:auto; }
+  .import-box{
+    border:1px solid var(--rule);
+    background:#fff;
+    padding:16px;
+    margin-bottom:24px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  .import-box .desc{ font-size:12px; color:var(--muted); flex:1 1 260px; }
+  .divider-label{
+    font-size:12px; color:var(--muted); text-align:center;
+    margin:20px 0; position:relative;
+  }
+  .divider-label::before, .divider-label::after{
+    content:''; display:inline-block; width:36%; height:1px;
+    background:var(--rule); vertical-align:middle; margin:0 8px;
+  }
+  #import-result{ font-size:13px; margin-top:10px; display:none; }
+  #import-result.ok{ color:var(--complete); }
+  #import-result.err{ color:var(--accent); }
+  td.small-note{ font-size:12px; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -153,6 +178,16 @@
 
   <!-- 명단 관리 -->
   <div class="panel" id="panel-participants">
+
+    <div class="import-box">
+      <span class="desc">참가신청서 엑셀 파일(이름·전공·연락처·희망기업 등)을 그대로 올리면 한 번에 등록됩니다.</span>
+      <input type="file" id="excel-file-input" accept=".xlsx,.xls">
+      <button class="btn btn-accent" id="import-excel-btn">엑셀로 일괄 등록</button>
+    </div>
+    <p id="import-result"></p>
+
+    <div class="divider-label">한 명씩 직접 추가</div>
+
     <div class="form-row">
       <div class="form-field">
         <label for="p-name">이름</label>
@@ -162,12 +197,27 @@
         <label for="p-phone">전화번호</label>
         <input type="tel" id="p-phone" placeholder="예: 010-1234-5678">
       </div>
+      <div class="form-field">
+        <label for="p-major">전공</label>
+        <input type="text" id="p-major" placeholder="예: 경영학전공">
+      </div>
+      <div class="form-field">
+        <label for="p-company">희망기업</label>
+        <input type="text" id="p-company" placeholder="예: 삼성전자">
+      </div>
+      <div class="form-field">
+        <label for="p-job">희망직무</label>
+        <input type="text" id="p-job" placeholder="예: 마케팅">
+      </div>
       <button class="btn btn-accent" id="add-participant-btn">명단에 추가</button>
     </div>
-    <table>
-      <thead><tr><th>이름</th><th>전화번호</th><th></th></tr></thead>
-      <tbody id="participants-table-body"></tbody>
-    </table>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>이름</th><th>전화번호</th><th>전공</th><th>학년/상태</th><th>희망기업</th><th>희망직무</th><th>구분</th><th></th></tr></thead>
+        <tbody id="participants-table-body"></tbody>
+      </table>
+    </div>
   </div>
 
   <!-- 피드백 작성 -->
@@ -186,6 +236,8 @@
   </div>
 </div>
 
+<!-- 엑셀 읽기 -->
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -315,14 +367,20 @@ window.deleteSlot = async function(slotId){
   loadAll();
 };
 
-// ---------- 명단 관리 ----------
+// ---------- 명단 관리: 한 명씩 추가 ----------
 document.getElementById('add-participant-btn').addEventListener('click', async () => {
   const name = document.getElementById('p-name').value.trim();
   const phone = normalizePhone(document.getElementById('p-phone').value);
+  const major = document.getElementById('p-major').value.trim();
+  const company = document.getElementById('p-company').value.trim();
+  const job = document.getElementById('p-job').value.trim();
   if(!name || !phone){ alert('이름과 전화번호를 모두 입력해주세요.'); return; }
-  await db.collection('participants').doc(phone).set({ name, phone });
+  await db.collection('participants').doc(phone).set({ name, phone, major, company, job }, { merge: true });
   document.getElementById('p-name').value = '';
   document.getElementById('p-phone').value = '';
+  document.getElementById('p-major').value = '';
+  document.getElementById('p-company').value = '';
+  document.getElementById('p-job').value = '';
   loadAll();
 });
 
@@ -331,15 +389,20 @@ async function renderParticipants(){
   const snap = await db.collection('participants').orderBy('name').get();
   tbody.innerHTML = '';
   if(snap.empty){
-    tbody.innerHTML = '<tr><td colspan="3" class="empty">등록된 참가자가 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">등록된 참가자가 없습니다.</td></tr>';
     return;
   }
   snap.forEach(doc => {
     const d = doc.data();
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${d.name}</td>
-      <td>${d.phone}</td>
+      <td>${d.name || ''}</td>
+      <td>${d.phone || ''}</td>
+      <td class="small-note">${d.major || ''}</td>
+      <td class="small-note">${d.yearStatus || ''}</td>
+      <td class="small-note">${d.company || ''}</td>
+      <td class="small-note">${d.job || ''}</td>
+      <td class="small-note">${d.teamType || ''}${d.teamName ? ' · ' + d.teamName : ''}</td>
       <td><button class="btn btn-danger" onclick="deleteParticipant('${doc.id}')">삭제</button></td>
     `;
     tbody.appendChild(tr);
@@ -351,6 +414,85 @@ window.deleteParticipant = async function(phone){
   await db.collection('participants').doc(phone).delete();
   loadAll();
 };
+
+// ---------- 명단 관리: 엑셀 일괄 등록 ----------
+document.getElementById('import-excel-btn').addEventListener('click', async () => {
+  const fileInput = document.getElementById('excel-file-input');
+  const resultEl = document.getElementById('import-result');
+  resultEl.style.display = 'none';
+
+  const file = fileInput.files[0];
+  if(!file){ alert('엑셀 파일을 먼저 선택해주세요.'); return; }
+
+  try{
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type: 'array' });
+
+    // "이름" 컬럼을 가진 시트를 찾음 (요약 시트 등은 건너뜀)
+    let rows = null;
+    for(const sheetName of wb.SheetNames){
+      const sheet = wb.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      if(json.length > 0 && Object.prototype.hasOwnProperty.call(json[0], '이름')){
+        rows = json;
+        break;
+      }
+    }
+
+    if(!rows){
+      resultEl.textContent = '"이름" 컬럼을 가진 시트를 찾지 못했습니다. 파일 형식을 확인해주세요.';
+      resultEl.className = 'err';
+      resultEl.style.display = 'block';
+      return;
+    }
+
+    const batch = db.batch();
+    let count = 0;
+    let skipped = 0;
+
+    rows.forEach(row => {
+      const name = String(row['이름'] || '').trim();
+      const phone = normalizePhone(row['연락처']);
+      if(!name || !phone){ skipped++; return; }
+
+      const docData = {
+        name,
+        phone,
+        major: String(row['학과(전공)'] || '').trim(),
+        yearStatus: String(row['학년/상태'] || '').trim(),
+        studentId: String(row['학번'] || '').trim(),
+        email: String(row['이메일'] || '').trim(),
+        mode: String(row['희망 운영방식'] || '').trim(),
+        teamType: String(row['개인/Team'] || '').trim(),
+        teamName: String(row['팀명'] || '').trim(),
+        company: String(row['희망기업'] || '').trim(),
+        job: String(row['희망직무'] || '').trim(),
+        note: String(row['확인사항'] || '').trim()
+      };
+      const ref = db.collection('participants').doc(phone);
+      batch.set(ref, docData, { merge: true });
+      count++;
+    });
+
+    if(count === 0){
+      resultEl.textContent = '등록할 수 있는 행이 없습니다 (이름/연락처 필요).';
+      resultEl.className = 'err';
+      resultEl.style.display = 'block';
+      return;
+    }
+
+    await batch.commit();
+    resultEl.textContent = `${count}명 등록 완료${skipped > 0 ? ` (이름 또는 연락처가 없어 ${skipped}건 제외)` : ''}`;
+    resultEl.className = 'ok';
+    resultEl.style.display = 'block';
+    fileInput.value = '';
+    loadAll();
+  }catch(e){
+    resultEl.textContent = '읽는 중 오류가 발생했습니다: ' + e.message;
+    resultEl.className = 'err';
+    resultEl.style.display = 'block';
+  }
+});
 
 // ---------- 피드백 작성 ----------
 async function renderFeedbackSelect(){
