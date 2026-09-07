@@ -118,6 +118,15 @@
     font-size:13px;
     margin-left:4px;
   }
+  .mode-tag{
+    display:inline-block;
+    font-size:12px;
+    color:var(--muted);
+    border:1px solid var(--rule);
+    padding:1px 7px;
+    margin-left:8px;
+    vertical-align:middle;
+  }
   .status-closed{
     font-size:13px;
     color:var(--muted);
@@ -364,7 +373,7 @@ async function loadSlots(){
     const lbl = formatLabel(mySlot.date, mySlot.time);
     const canCancel = daysUntil(mySlot.date) >= 3;
     myRow.innerHTML = `
-      <span class="when">${lbl.main}<span class="weekday">${lbl.weekday}</span></span>
+      <span class="when">${lbl.main}<span class="weekday">${lbl.weekday}</span>${mySlot.mode ? `<span class="mode-tag">${mySlot.mode}</span>` : ''}</span>
       ${canCancel
         ? `<button class="btn-line muted" onclick="cancelSlot('${mySlot.id}')">취소</button>`
         : `<span class="status-closed">취소 불가</span>`}
@@ -387,7 +396,7 @@ async function loadSlots(){
       const row = document.createElement('div');
       row.className = 'row';
       row.innerHTML = `
-        <span class="when">${lbl.main}<span class="weekday">${lbl.weekday}</span></span>
+        <span class="when">${lbl.main}<span class="weekday">${lbl.weekday}</span>${s.mode ? `<span class="mode-tag">${s.mode}</span>` : ''}</span>
         <button class="btn-line" ${mySlot ? 'disabled style="opacity:.4;cursor:default;"' : ''} onclick="bookSlot('${s.id}')">예약</button>
       `;
       listEl.appendChild(row);
