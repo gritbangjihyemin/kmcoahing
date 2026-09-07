@@ -164,6 +164,24 @@
     font-size:13px;
     color:var(--muted);
   }
+  .toast{
+    position:fixed;
+    left:50%;
+    bottom:28px;
+    transform:translateX(-50%);
+    background:var(--complete);
+    color:#fff;
+    padding:12px 20px;
+    font-size:14px;
+    box-shadow:0 4px 14px rgba(0,0,0,.15);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .3s ease;
+    z-index:100;
+  }
+  .toast.show{
+    opacity:1;
+  }
 </style>
 </head>
 <body>
@@ -206,6 +224,8 @@
   <p id="loading" style="display:none;">처리 중...</p>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -237,6 +257,14 @@ function formatLabel(dateStr, timeStr){
 
 function setLoading(on){
   loading.style.display = on ? 'block' : 'none';
+}
+
+function showToast(message){
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { toast.classList.remove('show'); }, 2200);
 }
 
 // 세션 유지: 새로고침해도 다시 입력하지 않도록
@@ -376,6 +404,7 @@ window.bookSlot = async function(slotId){
     });
     setLoading(false);
     loadSlots();
+    showToast('예약이 완료되었습니다.');
   }catch(e){
     setLoading(false);
     alert(e.message);
@@ -392,6 +421,7 @@ window.cancelSlot = async function(slotId){
     });
     setLoading(false);
     loadSlots();
+    showToast('예약이 취소되었습니다.');
   }catch(e){
     setLoading(false);
     alert('취소 중 오류가 발생했습니다: ' + e.message);
