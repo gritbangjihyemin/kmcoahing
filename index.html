@@ -258,7 +258,7 @@ async function verifyUser(name, phoneRaw){
   if(!snap.exists) return null;
   const data = snap.data();
   if((data.name || '').trim() !== name.trim()) return null;
-  return { name: data.name, phone };
+  return { name: data.name, phone, major: data.major || '' };
 }
 
 document.getElementById('verify-btn').addEventListener('click', async () => {
@@ -294,7 +294,8 @@ document.getElementById('switch-user-btn').addEventListener('click', () => {
 function enterMainStep(){
   verifyStep.style.display = 'none';
   mainStep.style.display = 'block';
-  document.getElementById('greeting-name').textContent = currentUser.name;
+  document.getElementById('greeting-name').textContent = currentUser.name +
+    (currentUser.major ? ` (${currentUser.major})` : '');
   loadSlots();
   loadFeedback();
 }
