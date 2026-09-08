@@ -149,6 +149,9 @@
 
   <!-- 예약 현황 -->
   <div class="panel active" id="panel-status">
+    <div style="text-align:right; margin-bottom:14px;">
+      <button class="btn btn-line" id="export-status-btn">엑셀로 다운로드</button>
+    </div>
     <table>
       <thead>
         <tr><th>날짜</th><th>시간</th><th>방식</th><th>예약자</th><th>전화번호</th><th>상태</th><th></th></tr>
@@ -335,6 +338,38 @@ window.adminCancelSlot = async function(slotId){
   });
   loadAll();
 };
+
+// ---------- 예약 현황 엑셀 다운로드 ----------
+document.getElementById('export-status-btn').addEventListener('click', async () => {
+  const snap = await db.collection('slots').orderBy('date').orderBy('time').get();
+  const rows = [];
+  snap.forEach(doc => {
+    const d = doc.data();
+    const reserved = !!d.reservedBy;
+    rows.push({
+      '날짜': formatDate(d.date),
+      '시간': d.time,
+      '방식': d.mode || '',
+      '예약자': reserved ? d.reservedBy.name : '',
+      '전화번호': reserved ? d.reservedBy.phone : '',
+      '상태': reserved ? '예약완료' : '공석'
+    });
+  });
+
+  if(rows.length === 0){
+    alert('등록된 시간대가 없습니다.');
+    return;
+  }
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 15 }, { wch: 10 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '예약현황');
+
+  const today = new Date();
+  const stamp = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `예약현황_${stamp}.xlsx`);
+});
 
 // ---------- 시간대 관리 ----------
 // 30분 단위 시간 옵션 생성 (00:00 ~ 23:30)
